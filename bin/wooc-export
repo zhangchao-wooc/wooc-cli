@@ -1,0 +1,32 @@
+#! /usr/bin/env node
+
+const path = require('path')
+const fs = require('fs-extra')
+const program = require('commander')
+const chalk = require('chalk')
+const root = process.cwd()
+const ExportFile = require('../dist/lib/exportFile').default
+
+program
+  .option('--mode <modeName>', 'export file mode: 1、root 2、multiple', 'root')
+  .option('--paths <pathName>', 'locales paths', './src/locales')
+  .parse(process.argv)
+
+  const { mode, paths } = program.opts()
+
+  const localesPath = path.join(root, paths)
+
+  if (!fs.existsSync(localesPath)) {
+    console.log(chalk.red(`找不到项目配置文件${localesPath}，请确定当前路径!`))
+    process.exit(1)
+  }
+
+  const exportFile = new ExportFile(localesPath)
+
+  exportFile.init({
+    mode: 'root',
+    paths,
+  })
+
+
+  
