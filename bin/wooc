@@ -1,12 +1,17 @@
 #! /usr/bin/env node
 
-const program = require('commander')
-const { getVersion } = require('../dist/until')
+/** @format */
+
+const program = require('commander');
+const {
+  getVersion
+} = require('../dist/until');
 
 program
   .version(getVersion())
   .usage('<command> [options]')
   .command('export', 'Export file') // mode： root、根目录 、multiple：多目录递归查询
-  .parse(process.argv)
+  .command('import', 'Import file') // 导入、本地数据
+  .parse(process.argv);
 
-  console.log('export');
+console.log('export');
