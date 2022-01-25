@@ -6,13 +6,19 @@ const program = require('commander')
 const chalk = require('chalk')
 const root = process.cwd()
 const ExportFile = require('../dist/lib/exportFile').default
+const desc = {
+  mode: 'export file mode: \n[1] single 单文件 \n [2]、multiple 多文件 \n default: single' ,
+  paths: 'locales paths \n default: ./src/locales',
+  type: 'export file type: \n[1] xlsx 表格 \n [2] json 集合 \n default: xlsx',
+}
 
 program
-  .option('--mode <modeName>', 'export file mode: 1、root 2、multiple', 'root')
-  .option('--paths <pathName>', 'locales paths', './src/locales')
+  .option('--mode <modeName>', desc.mode, 'single')
+  .option('--paths <pathName>', desc.paths, './src/locales')
+  .option('--type <typeName>', desc.type, 'xlsx')
   .parse(process.argv)
 
-  const { mode, paths } = program.opts()
+  const { mode, paths, type } = program.opts()
 
   const localesPath = path.join(root, paths)
 
@@ -24,8 +30,9 @@ program
   const exportFile = new ExportFile(localesPath)
 
   exportFile.init({
-    mode: 'root',
+    mode,
     paths,
+    type
   })
 
 

@@ -2,7 +2,7 @@
 
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import {exportExcelFile} from '../until/index';
+import {exportFile, logger} from '../until/index';
 
 interface deepData {
   data: Record<string, unknown> | any;
@@ -11,22 +11,29 @@ interface deepData {
 }
 export default class ExportFile {
   paths: string;
+  exportFileType: string;
   newFileList: string[];
+  jsonData: object;
   num: number;
   Rows: string[][];
   Header: any;
   constructor() {
     this.paths = '';
+    this.exportFileType = '';
     this.newFileList = [];
+    this.jsonData = {};
     this.num = 0; // 词条索引
     this.Rows = []; // 表格行数据
     this.Header = [{caption: 'code', type: 'string'}]; // 表格头
   }
 
-  init(agv: {mode: string; paths: string}) {
+  init(agv: {mode: string; paths: string; type: string}) {
+    console.warn('init', agv);
+
     switch (agv.mode) {
-      case 'root':
-        this.paths = agv.paths;
+      case 'single':
+        this.paths = path.join(process.cwd(), agv.paths);
+        this.exportFileType = agv.type;
         this.modeRoot();
         break;
       case 'multiple':
@@ -36,7 +43,6 @@ export default class ExportFile {
   }
 
   modeRoot() {
-    console.log('modeRoot');
     this.readDirectory();
   }
 
@@ -57,7 +63,11 @@ export default class ExportFile {
           }
         });
 
-        filterList.length !== 0 && this.copyFile(filterList);
+        if (filterList.length !== 0) {
+          this.copyFile(filterList);
+        } else {
+          logger.warn(`readDirectory：目录文件为空，请确认目录 ${this.paths} 下是否存在多语言文件`);
+        }
       })
       .catch(err => {
         throw `readDirectory: ${err}`;
@@ -68,7 +78,7 @@ export default class ExportFile {
   async copyFile(filterList) {
     await filterList.forEach((e, i) => {
       if (e.includes('.ts')) {
-        const filePath = path.join(process.cwd(), this.paths, e);
+        const filePath = path.join(this.paths, e);
         const newFileName = e.replace('.ts', '.js');
         const outputPath = filePath.replace('.ts', '.js');
         try {
@@ -82,7 +92,7 @@ export default class ExportFile {
       }
     });
 
-    await this.fileDataStructure(filterList, path.join(process.cwd(), './locales/'));
+    await this.fileDataStructure(filterList, this.paths);
   }
 
   // 处理数据结构
@@ -98,32 +108,45 @@ export default class ExportFile {
             console.log(err);
           });
 
-        // 设置表格头
-        this.Header.push({
-          caption: filterList[i].split('.')[0],
-          type: 'string',
-        });
-        await this.dealNestedData({
-          data: res,
-          langNumber: i,
-          parent: '',
-        });
+        if (this.exportFileType === 'xlsx') {
+          // 收集 xlsx 文件数据
+          // 设置表格头
+          this.Header.push({
+            caption: filterList[i].split('.')[0],
+            type: 'string',
+          });
+          await this.dealNestedData({
+            data: res,
+            langNumber: i,
+            parent: '',
+          });
 
-        this.num = 0; // 清空当前词条索引
+          this.num = 0; // 清空当前词条索引
+        } else if (this.exportFileType === 'json') {
+          // 收集 json 文件数据
+          this.jsonData[filterList[i].split('.')[0]] = res;
+        } else {
+          logger.warn(`fileDataStructure: 不支${this.exportFileType} 类型文件导出。请查看文档`);
+          return;
+        }
       } catch (err) {
         console.log(err);
       }
     }
 
-    // console.log(this.Rows, this.Header);
-    exportExcelFile(this.Header, this.Rows, 'locales');
+    // 导出文件
+    exportFile(
+      this.exportFileType === 'xlsx' ? {cols: this.Header, rows: this.Rows} : JSON.stringify(this.jsonData),
+      this.exportFileType,
+    );
+
     this.newFileList.forEach(item => {
       fs.remove(item)
         .then(() => {
-          console.log('\n转换文件删除成功！');
+          logger.log('\n转换文件删除成功！');
         })
         .catch(err => {
-          console.warn(`\n转换文件${item}删除失败: ${err}`);
+          logger.warn(`\n转换文件${item}删除失败: ${err}`);
         });
     });
   }
