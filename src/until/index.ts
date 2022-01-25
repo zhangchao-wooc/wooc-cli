@@ -17,11 +17,11 @@ export const getVersion = () => {
 };
 
 // 导出文件
-export const exportFile = (file, type, filePath?: string) => {
+export const exportFile = (file, type, filePath: string) => {
   const result = type === 'xlsx' ? nodeExcel.execute(file) : file;
   const time = new Date().getTime(); // 用来保证生成不同的文件名
   const fileName = `locales_${DateFormat(time)}.${type}`; // 文件名
-  const exportPath = path.join(filePath ? filePath : process.cwd(), fileName);
+  const exportPath = path.join(filePath, '../', fileName); // 导出路径 当前 locales 同级目录下
   const encoding = type === 'xlsx' ? 'binary' : 'utf-8';
   const spinner = ora('正在导出...').start();
 

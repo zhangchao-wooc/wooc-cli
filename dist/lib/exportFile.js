@@ -14,6 +14,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const child_process = require("child_process");
 const index_1 = require("../until/index");
+const common_1 = require("../common");
 class ExportFile {
     constructor() {
         this.paths = '';
@@ -30,7 +31,7 @@ class ExportFile {
         this.exportFileType = agv.type;
         switch (agv.mode) {
             case 'single':
-                this.modeRoot();
+                this.modeSingle();
                 break;
             case 'multiple':
                 this.modeMultiple();
@@ -40,10 +41,12 @@ class ExportFile {
                 break;
         }
     }
-    modeRoot() {
+    modeSingle() {
+        // 单文件导出
         this.readDirectory(this.paths);
     }
     modeMultiple() {
+        // 多文件 递归查询处理后导出
         child_process.exec('find . -name locales', (err, stdout, stderr) => {
             if (err) {
                 throw `modeMultiple: ${err}`;
@@ -53,9 +56,8 @@ class ExportFile {
                     return item;
                 }
             });
-            console.log('modeMultiple', this.exportFileType);
             dirList.forEach(item => {
-                console.log(path.join(process.cwd(), item));
+                index_1.logger.log(`匹配文件：${path.join(process.cwd(), item)}`);
                 this.readDirectory(path.join(process.cwd(), item));
             });
         });
@@ -66,8 +68,9 @@ class ExportFile {
             .then(res => {
             const list = res;
             const filterList = [];
+            const reg = /(.js|.ts|.json)/;
             list.map(item => {
-                if (!item.toLowerCase().includes('index')) {
+                if (!item.toLowerCase().includes('index') && reg.test(item)) {
                     filterList.push(item);
                 }
             });
@@ -109,6 +112,7 @@ class ExportFile {
         return __awaiter(this, void 0, void 0, function* () {
             for (let i = 0; i < filterList.length; i++) {
                 try {
+                    const fileName = filterList[i].split('.')[0];
                     // 读取文件内容
                     const res = yield Promise.resolve().then(() => require(path.join(filePath, filterList[i]))).then(res => {
                         return res;
@@ -120,7 +124,7 @@ class ExportFile {
                         // 收集 xlsx 文件数据
                         // 设置表格头
                         this.Header.push({
-                            caption: filterList[i].split('.')[0],
+                            caption: common_1.region[fileName] ? common_1.region[fileName] : fileName,
                             type: 'string',
                         });
                         yield this.dealNestedData({
@@ -132,7 +136,7 @@ class ExportFile {
                     }
                     else if (this.exportFileType === 'json') {
                         // 收集 json 文件数据
-                        this.jsonData[filterList[i].split('.')[0]] = res;
+                        this.jsonData[fileName] = res;
                     }
                     else {
                         index_1.logger.warn(`fileDataStructure: 不支${this.exportFileType} 类型文件导出。请查看文档`);
@@ -145,15 +149,12 @@ class ExportFile {
             }
             // 导出文件
             (0, index_1.exportFile)(this.exportFileType === 'xlsx' ? { cols: this.Header, rows: this.Rows } : JSON.stringify(this.jsonData), this.exportFileType, filePath);
+            // 初始数据
             this.Header = [{ caption: 'code', type: 'string' }];
             this.Rows = [];
             this.jsonData = {};
             this.newFileList.forEach(item => {
-                fs.remove(item)
-                    .then(() => {
-                    index_1.logger.log('\n转换文件删除成功！');
-                })
-                    .catch(err => {
+                fs.remove(item).catch(err => {
                     index_1.logger.warn(`\n转换文件${item}删除失败: ${err}`);
                 });
             });

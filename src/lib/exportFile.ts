@@ -4,6 +4,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as child_process from 'child_process';
 import {exportFile, logger} from '../until/index';
+import {region} from '../common';
 
 interface deepData {
   data: Record<string, unknown> | any;
@@ -34,7 +35,7 @@ export default class ExportFile {
     this.exportFileType = agv.type;
     switch (agv.mode) {
       case 'single':
-        this.modeRoot();
+        this.modeSingle();
         break;
       case 'multiple':
         this.modeMultiple();
@@ -45,11 +46,13 @@ export default class ExportFile {
     }
   }
 
-  modeRoot() {
+  modeSingle() {
+    // 单文件导出
     this.readDirectory(this.paths);
   }
 
   modeMultiple() {
+    // 多文件 递归查询处理后导出
     child_process.exec('find . -name locales', (err, stdout, stderr) => {
       if (err) {
         throw `modeMultiple: ${err}`;
@@ -60,9 +63,9 @@ export default class ExportFile {
           return item;
         }
       });
-      console.log('modeMultiple', this.exportFileType);
+
       dirList.forEach(item => {
-        console.log(path.join(process.cwd(), item));
+        logger.log(`匹配文件：${path.join(process.cwd(), item)}`);
 
         this.readDirectory(path.join(process.cwd(), item));
       });
@@ -75,9 +78,9 @@ export default class ExportFile {
       .then(res => {
         const list = res;
         const filterList: string[] = [];
-
+        const reg = /(.js|.ts|.json)/;
         list.map(item => {
-          if (!item.toLowerCase().includes('index')) {
+          if (!item.toLowerCase().includes('index') && reg.test(item)) {
             filterList.push(item);
           }
         });
@@ -118,6 +121,7 @@ export default class ExportFile {
   async fileDataStructure(filterList, filePath: string) {
     for (let i = 0; i < filterList.length; i++) {
       try {
+        const fileName = filterList[i].split('.')[0];
         // 读取文件内容
         const res = await import(path.join(filePath, filterList[i]))
           .then(res => {
@@ -131,7 +135,7 @@ export default class ExportFile {
           // 收集 xlsx 文件数据
           // 设置表格头
           this.Header.push({
-            caption: filterList[i].split('.')[0],
+            caption: region[fileName] ? region[fileName] : fileName,
             type: 'string',
           });
           await this.dealNestedData({
@@ -143,7 +147,7 @@ export default class ExportFile {
           this.num = 0; // 清空当前词条索引
         } else if (this.exportFileType === 'json') {
           // 收集 json 文件数据
-          this.jsonData[filterList[i].split('.')[0]] = res;
+          this.jsonData[fileName] = res;
         } else {
           logger.warn(`fileDataStructure: 不支${this.exportFileType} 类型文件导出。请查看文档`);
           return;
@@ -159,18 +163,15 @@ export default class ExportFile {
       this.exportFileType,
       filePath,
     );
+    // 初始数据
     this.Header = [{caption: 'code', type: 'string'}];
     this.Rows = [];
     this.jsonData = {};
 
     this.newFileList.forEach(item => {
-      fs.remove(item)
-        .then(() => {
-          logger.log('\n转换文件删除成功！');
-        })
-        .catch(err => {
-          logger.warn(`\n转换文件${item}删除失败: ${err}`);
-        });
+      fs.remove(item).catch(err => {
+        logger.warn(`\n转换文件${item}删除失败: ${err}`);
+      });
     });
   }
 
