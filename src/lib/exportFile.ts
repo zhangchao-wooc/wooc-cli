@@ -2,6 +2,7 @@
 
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import * as child_process from 'child_process';
 import {exportFile, logger} from '../until/index';
 
 interface deepData {
@@ -29,30 +30,48 @@ export default class ExportFile {
 
   init(agv: {mode: string; paths: string; type: string}) {
     console.warn('init', agv);
-
+    this.paths = path.join(process.cwd(), agv.paths);
+    this.exportFileType = agv.type;
     switch (agv.mode) {
       case 'single':
-        this.paths = path.join(process.cwd(), agv.paths);
-        this.exportFileType = agv.type;
         this.modeRoot();
         break;
       case 'multiple':
         this.modeMultiple();
         break;
+      default:
+        logger.error(`export: --mode 错误参数 ${agv.mode}，请检查 --mode 传参`);
+        break;
     }
   }
 
   modeRoot() {
-    this.readDirectory();
+    this.readDirectory(this.paths);
   }
 
   modeMultiple() {
-    console.log('modeMultiple');
+    child_process.exec('find . -name locales', (err, stdout, stderr) => {
+      if (err) {
+        throw `modeMultiple: ${err}`;
+      }
+
+      const dirList = stdout.split('\n').filter(item => {
+        if (typeof item === 'string' && item !== '') {
+          return item;
+        }
+      });
+      console.log('modeMultiple', this.exportFileType);
+      dirList.forEach(item => {
+        console.log(path.join(process.cwd(), item));
+
+        this.readDirectory(path.join(process.cwd(), item));
+      });
+    });
   }
 
   // 读取目录
-  readDirectory() {
-    fs.readdir(this.paths)
+  readDirectory(directoryPath: string) {
+    fs.readdir(directoryPath)
       .then(res => {
         const list = res;
         const filterList: string[] = [];
@@ -64,9 +83,9 @@ export default class ExportFile {
         });
 
         if (filterList.length !== 0) {
-          this.copyFile(filterList);
+          this.copyFile(filterList, directoryPath);
         } else {
-          logger.warn(`readDirectory：目录文件为空，请确认目录 ${this.paths} 下是否存在多语言文件`);
+          logger.warn(`readDirectory：目录文件为空，请确认目录 ${directoryPath} 下是否存在多语言文件`);
         }
       })
       .catch(err => {
@@ -75,10 +94,10 @@ export default class ExportFile {
   }
 
   // 转换 ts 文件、修改为 cjs 导出方式
-  async copyFile(filterList) {
+  async copyFile(filterList, directoryPath: string) {
     await filterList.forEach((e, i) => {
       if (e.includes('.ts')) {
-        const filePath = path.join(this.paths, e);
+        const filePath = path.join(directoryPath, e);
         const newFileName = e.replace('.ts', '.js');
         const outputPath = filePath.replace('.ts', '.js');
         try {
@@ -92,7 +111,7 @@ export default class ExportFile {
       }
     });
 
-    await this.fileDataStructure(filterList, this.paths);
+    await this.fileDataStructure(filterList, directoryPath);
   }
 
   // 处理数据结构
@@ -138,7 +157,11 @@ export default class ExportFile {
     exportFile(
       this.exportFileType === 'xlsx' ? {cols: this.Header, rows: this.Rows} : JSON.stringify(this.jsonData),
       this.exportFileType,
+      filePath,
     );
+    this.Header = [{caption: 'code', type: 'string'}];
+    this.Rows = [];
+    this.jsonData = {};
 
     this.newFileList.forEach(item => {
       fs.remove(item)

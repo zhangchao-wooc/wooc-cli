@@ -12,6 +12,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs = require("fs-extra");
 const path = require("path");
+const child_process = require("child_process");
 const index_1 = require("../until/index");
 class ExportFile {
     constructor() {
@@ -25,26 +26,43 @@ class ExportFile {
     }
     init(agv) {
         console.warn('init', agv);
+        this.paths = path.join(process.cwd(), agv.paths);
+        this.exportFileType = agv.type;
         switch (agv.mode) {
             case 'single':
-                this.paths = path.join(process.cwd(), agv.paths);
-                this.exportFileType = agv.type;
                 this.modeRoot();
                 break;
             case 'multiple':
                 this.modeMultiple();
                 break;
+            default:
+                index_1.logger.error(`export: --mode 错误参数 ${agv.mode}，请检查 --mode 传参`);
+                break;
         }
     }
     modeRoot() {
-        this.readDirectory();
+        this.readDirectory(this.paths);
     }
     modeMultiple() {
-        console.log('modeMultiple');
+        child_process.exec('find . -name locales', (err, stdout, stderr) => {
+            if (err) {
+                throw `modeMultiple: ${err}`;
+            }
+            const dirList = stdout.split('\n').filter(item => {
+                if (typeof item === 'string' && item !== '') {
+                    return item;
+                }
+            });
+            console.log('modeMultiple', this.exportFileType);
+            dirList.forEach(item => {
+                console.log(path.join(process.cwd(), item));
+                this.readDirectory(path.join(process.cwd(), item));
+            });
+        });
     }
     // 读取目录
-    readDirectory() {
-        fs.readdir(this.paths)
+    readDirectory(directoryPath) {
+        fs.readdir(directoryPath)
             .then(res => {
             const list = res;
             const filterList = [];
@@ -54,10 +72,10 @@ class ExportFile {
                 }
             });
             if (filterList.length !== 0) {
-                this.copyFile(filterList);
+                this.copyFile(filterList, directoryPath);
             }
             else {
-                index_1.logger.warn(`readDirectory：目录文件为空，请确认目录 ${this.paths} 下是否存在多语言文件`);
+                index_1.logger.warn(`readDirectory：目录文件为空，请确认目录 ${directoryPath} 下是否存在多语言文件`);
             }
         })
             .catch(err => {
@@ -65,11 +83,11 @@ class ExportFile {
         });
     }
     // 转换 ts 文件、修改为 cjs 导出方式
-    copyFile(filterList) {
+    copyFile(filterList, directoryPath) {
         return __awaiter(this, void 0, void 0, function* () {
             yield filterList.forEach((e, i) => {
                 if (e.includes('.ts')) {
-                    const filePath = path.join(this.paths, e);
+                    const filePath = path.join(directoryPath, e);
                     const newFileName = e.replace('.ts', '.js');
                     const outputPath = filePath.replace('.ts', '.js');
                     try {
@@ -83,7 +101,7 @@ class ExportFile {
                     }
                 }
             });
-            yield this.fileDataStructure(filterList, this.paths);
+            yield this.fileDataStructure(filterList, directoryPath);
         });
     }
     // 处理数据结构
@@ -126,7 +144,10 @@ class ExportFile {
                 }
             }
             // 导出文件
-            (0, index_1.exportFile)(this.exportFileType === 'xlsx' ? { cols: this.Header, rows: this.Rows } : JSON.stringify(this.jsonData), this.exportFileType);
+            (0, index_1.exportFile)(this.exportFileType === 'xlsx' ? { cols: this.Header, rows: this.Rows } : JSON.stringify(this.jsonData), this.exportFileType, filePath);
+            this.Header = [{ caption: 'code', type: 'string' }];
+            this.Rows = [];
+            this.jsonData = {};
             this.newFileList.forEach(item => {
                 fs.remove(item)
                     .then(() => {

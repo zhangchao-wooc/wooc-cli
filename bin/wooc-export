@@ -22,7 +22,7 @@ program
 
   const localesPath = path.join(root, paths)
 
-  if (!fs.existsSync(localesPath)) {
+  if (mode === 'single' && !fs.existsSync(localesPath)) {
     console.log(chalk.red(`找不到项目配置文件${localesPath}，请确定当前路径!`))
     process.exit(1)
   }
