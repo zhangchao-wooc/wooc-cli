@@ -11,11 +11,13 @@ interface deepData {
 }
 export default class ExportFile {
   paths: string;
+  newFileList: string[];
   num: number;
   Rows: string[][];
   Header: any;
   constructor() {
     this.paths = '';
+    this.newFileList = [];
     this.num = 0; // 词条索引
     this.Rows = []; // 表格行数据
     this.Header = [{caption: 'code', type: 'string'}]; // 表格头
@@ -58,25 +60,29 @@ export default class ExportFile {
         filterList.length !== 0 && this.copyFile(filterList);
       })
       .catch(err => {
-        console.log(err);
+        throw `readDirectory: ${err}`;
       });
   }
 
-  // 复制文件、修改为 cjs 导出
-  copyFile(filterList) {
-    filterList.forEach(e => {
-      const filePath = path.join(process.cwd(), this.paths, e);
-      const copyPath = './locales/' + e;
-      fs.copy(filePath, copyPath)
-        .then(() => {
-          const file = fs.readFileSync(copyPath).toString().replace('export default', 'module.exports = ');
-          fs.outputFile(copyPath, file).then(() => {});
-        })
-        .catch(err => {
-          console.log(err);
-        });
+  // 转换 ts 文件、修改为 cjs 导出方式
+  async copyFile(filterList) {
+    await filterList.forEach((e, i) => {
+      if (e.includes('.ts')) {
+        const filePath = path.join(process.cwd(), this.paths, e);
+        const newFileName = e.replace('.ts', '.js');
+        const outputPath = filePath.replace('.ts', '.js');
+        try {
+          const file = fs.readFileSync(filePath).toString().replace('export default', 'module.exports = ');
+          fs.outputFileSync(outputPath, file);
+          filterList[i] = newFileName;
+          this.newFileList.push(outputPath);
+        } catch (err) {
+          throw `copyFile(${e}文件):${err}`;
+        }
+      }
     });
-    this.fileDataStructure(filterList, path.join(process.cwd(), './locales/'));
+
+    await this.fileDataStructure(filterList, path.join(process.cwd(), './locales/'));
   }
 
   // 处理数据结构
@@ -111,6 +117,15 @@ export default class ExportFile {
 
     // console.log(this.Rows, this.Header);
     exportExcelFile(this.Header, this.Rows, 'locales');
+    this.newFileList.forEach(item => {
+      fs.remove(item)
+        .then(() => {
+          console.log('\n转换文件删除成功！');
+        })
+        .catch(err => {
+          console.warn(`\n转换文件${item}删除失败: ${err}`);
+        });
+    });
   }
 
   // 处理嵌套数据

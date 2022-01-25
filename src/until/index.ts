@@ -3,13 +3,15 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as nodeExcel from 'excel-export';
-import ora from 'ora';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const ora = require('ora');
 import {DateFormat} from '@wooc/brokenwheel';
 
 export const getRootPath = () => {
   return path.resolve(__dirname, '../../');
 };
 export const getVersion = () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require(path.join(getRootPath(), 'package.json')).version;
 };
 
