@@ -30,27 +30,30 @@ wooc export --mode single --paths ./src/locales --type xlsx
 
 ### config
 #### --mode 导出模式 
-[1]、single 单文件 
-
-[2]、multiple 多文件 
-该模式下会忽略 --paths 的参数
+>[1]、single 单文件 
+>
+>[2]、multiple 多文件 
+>
+>该模式下会忽略 --paths 的参数
 作用 递归当前目录下的所有文件名为 locales 的目录，并读取目录内容，导出文件
-
-default: single
+>
+>default: single
 
 <br>
 
 #### --paths 源文件路径
-default: ./src/locales'
+>--mode === multiple 模式下会忽略该配置参数
+>
+>default: ./src/locales'
 
 <br>
 
 #### --type 导出文件类型
-[1] xlsx 表格
-
-[2] json 集合
-
-default: xlsx
+>[1] xlsx 表格
+>
+>[2] json 集合
+>
+>default: xlsx
 
 
 
